@@ -15,39 +15,48 @@ if not GROQ_API_KEY:
     st.stop()
 
 # 🎨 Streamlit UI Styling
-st.set_page_config(page_title="Revenue Forecasting Agent", page_icon="📈", layout="wide")
-st.title("📈 AI Revenue Forecasting Agent with Prophet")
+st.set_page_config(page_title="Forecasting Agent - Revenue | Expense | Profit", page_icon="📈", layout="wide")
+st.title("📈 AI Forecasting Agent (Revenue / Expense / Profit) with Prophet")
 
 # File upload
-uploaded_file = st.file_uploader("Upload your Excel file (with 'Date' and 'Revenue' columns)", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload your Excel file (with 'Date' and any of 'Revenue', 'Expense', 'Profit' columns)", type=["xlsx"])
 
 if uploaded_file:
     # Read the Excel file
     df = pd.read_excel(uploaded_file)
-    
+
     st.subheader("📄 Uploaded Data Preview")
     st.write(df.head())
 
-    # Data validation
-    if "Date" not in df.columns or "Revenue" not in df.columns:
-        st.error("Uploaded file must contain 'Date' and 'Revenue' columns.")
+    # Check required 'Date' column
+    if "Date" not in df.columns:
+        st.error("Uploaded file must contain a 'Date' column.")
         st.stop()
+
+    # Detect available financial columns
+    available_targets = [col for col in ['Revenue', 'Expense', 'Profit'] if col in df.columns]
+    if not available_targets:
+        st.error("Your dataset must contain at least one of these columns: 'Revenue', 'Expense', or 'Profit'.")
+        st.stop()
+
+    # Let user select which target to forecast
+    target = st.selectbox("Select the metric to forecast", available_targets)
 
     # Preprocessing
     df['Date'] = pd.to_datetime(df['Date'])
-    df = df[['Date', 'Revenue']].rename(columns={'Date': 'ds', 'Revenue': 'y'})
+    df = df[['Date', target]].rename(columns={'Date': 'ds', target: 'y'})
 
     # Prophet Forecasting
     model = Prophet()
     model.fit(df)
 
-    # User selects forecast horizon
+    # Forecast horizon selection
     periods = st.slider("Select forecast horizon (months)", 1, 24, 6)
     future = model.make_future_dataframe(periods=periods, freq='M')
     forecast = model.predict(future)
 
     # Plot Forecast
-    st.subheader("🔮 Forecast Plot")
+    st.subheader(f"🔮 Forecast Plot for {target}")
     fig = plot_plotly(model, forecast)
     st.plotly_chart(fig)
 
@@ -61,11 +70,11 @@ if uploaded_file:
 
     client = Groq(api_key=GROQ_API_KEY)
     prompt = f"""
-    You are a Financial Analyst. Analyze the following forecasted revenue data and provide:
+    You are a Financial Analyst. Analyze the following forecasted {target.lower()} data and provide:
     - Key trends observed in the forecast.
     - Risks or uncertainties.
     - Actionable insights for business planning.
-    
+
     Dataset (JSON):
     {data_for_ai}
     """
@@ -82,4 +91,5 @@ if uploaded_file:
 
 else:
     st.info("👆 Please upload an Excel file to begin.")
+
 
