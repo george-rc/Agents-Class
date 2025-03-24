@@ -5,3 +5,5 @@ prophet
 python-dotenv
 plotly
 groq
+python-pptx
+kaleido
